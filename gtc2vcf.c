@@ -1,6 +1,6 @@
 /* The MIT License
 
-   Copyright (c) 2018-2025 Giulio Genovese
+   Copyright (c) 2018-2026 Giulio Genovese
 
    Author: Giulio Genovese <giulio.genovese@gmail.com>
 
@@ -34,7 +34,7 @@
 #include "tsv2vcf.h"
 #include "gtc2vcf.h"
 
-#define GTC2VCF_VERSION "2025-08-19"
+#define GTC2VCF_VERSION "2026-01-26"
 
 #define GT_NC 0
 #define GT_AA 1
@@ -1315,7 +1315,7 @@ static int idat_read(idat_t *idat, uint16_t id) {
         break;
     case RUN_INFO:
         read_bytes(idat->hfile, (void *)&idat->m_run_infos, sizeof(int32_t));
-        idat->run_infos = (RunInfo *)malloc(idat->m_run_infos * sizeof(RunInfo));
+        idat->run_infos = (RunInfo *)calloc(idat->m_run_infos, sizeof(RunInfo));
         for (i = 0; i < idat->m_run_infos; i++) {
             read_pfx_string(idat->hfile, &idat->run_infos[i].run_time, NULL);
             read_pfx_string(idat->hfile, &idat->run_infos[i].block_type, NULL);

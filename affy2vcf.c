@@ -35,7 +35,7 @@
 #include "bcftools.h"
 #include "gtc2vcf.h"
 
-#define AFFY2VCF_VERSION "2025-08-19"
+#define AFFY2VCF_VERSION "2025-10-08"
 
 #define TAG_LIST_DFLT "GT,CONF,BAF,LRR,NORMX,NORMY,DELTA,SIZE"
 #define GC_WIN_DFLT "200"
@@ -58,39 +58,54 @@
 #define FORMAT_DELTA (1 << 15)
 #define FORMAT_SIZE (1 << 16)
 
-// #%affymetrix—algorithm—param—apt—opt—use—copynumber—call—codes=0
-// #%call—code-1=NoCall:-1:2
-// #%call—code-2=AA:0:2
-// #%call—code-3=AB:1:2
-// #%call—code-4=BB:2:2
+// #%affymetrix-algorithm-param-apt-opt-use-copynumber-call-codes=0
+// #%call-code-1=NoCall:-1:2
+// #%call-code-2=AA:0:2
+// #%call-code-3=AB:1:2
+// #%call-code-4=BB:2:2
 #define GT_NC -1
 #define GT_AA 0
 #define GT_AB 1
 #define GT_BB 2
 
-// #%max—alleles=4
-// #%max—cn—states=2
-// #%call—code-1=OTV_1:-4:1
-// #%call—code-2=NoCall_1:-3:1
-// #%call—code-3=OTV:-2:2
-// #%call—code-4=NoCall:-1:2
-// #%call—code-5=AA:0:2
-// #%call—code-6=AB:1:2
-// #%call—code-7=BB:2:2
-// #%call—code-8=ZeroCN:3:0
-// #%call—code-9=A:4:1
-// #%call—code-10=B:5:1
-// #%call—code-11=C:6:1
-// #%call—code-12=AC:7:2
-// #%call—code-13=BC:8:2
-// #%call—code-14=CC:9:2
-// #%call—code-15=D:10:1
-// #%call—code-16=AD:11:2
-// #%call—code-17=BD:12:2
-// #%call—code-18=CD:13:2
-// #%call—code-19=DD:14:2
-static const int txt_gt[19] = {GT_NC, GT_NC, GT_NC, GT_NC, GT_AA, GT_AB, GT_BB, GT_NC, GT_AA, GT_BB,
-                               GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC};
+// #%max-alleles=4
+// #%max-cn-states=2
+// #%call-code-1=OTV_1:-4:1
+// #%call-code-2=NoCall_1:-3:1
+// #%call-code-3=OTV:-2:2
+// #%call-code-4=NoCall:-1:2
+// #%call-code-5=AA:0:2
+// #%call-code-6=AB:1:2
+// #%call-code-7=BB:2:2
+// #%call-code-8=ZeroCN:3:0
+// #%call-code-9=A:4:1
+// #%call-code-10=B:5:1
+// #%call-code-11=C:6:1
+// #%call-code-12=AC:7:2
+// #%call-code-13=BC:8:2
+// #%call-code-14=CC:9:2
+// #%call-code-15=D:10:1
+// #%call-code-16=AD:11:2
+// #%call-code-17=BD:12:2
+// #%call-code-18=CD:13:2
+// #%call-code-19=DD:14:2
+// #%call-code-20=E:15:1
+// #%call-code-21=AE:16:2
+// #%call-code-22=BE:17:2
+// #%call-code-23=CE:18:2
+// #%call-code-24=DE:19:2
+// #%call-code-25=EE:20:2
+// #%call-code-26=F:21:1
+// #%call-code-27=AF:22:2
+// #%call-code-28=BF:23:2
+// #%call-code-29=CF:24:2
+// #%call-code-30=DF:25:2
+// #%call-code-31=EF:26:2
+// #%call-code-32=FF:27:2
+static const int txt_gt[32] = {GT_NC, GT_NC, GT_NC, GT_NC, GT_AA, GT_AB, GT_BB, GT_NC,
+                               GT_AA, GT_BB, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC,
+                               GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC,
+                               GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC, GT_NC};
 static const int chp_gt[16] = {-1, -1, -1, -1, -1, -1, GT_AA, GT_BB, GT_AB, -1, -1, GT_NC, -1, -1, -1, -1};
 
 /****************************************
@@ -1713,7 +1728,7 @@ static int varitr_loop(varitr_t *varitr, void *probeset_ids) {
                     error("Expected %d columns but %d columns found in the calls file\n", 1 + varitr->nsmpl, ncols);
                 for (i = 1; i < 1 + varitr->nsmpl; i++) {
                     int gt = strtol(&str.s[off[i]], &tmp, 0);
-                    if (*tmp || gt < -4 || gt > 14)
+                    if (*tmp || gt < -4 || gt > 27)
                         error("Could not parse genotype %s found in the calls file\n", &str.s[off[i]]);
                     varitr->gts[i - 1] = txt_gt[4 + gt];
                 }

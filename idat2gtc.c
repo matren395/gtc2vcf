@@ -1,6 +1,6 @@
 /* The MIT License
 
-   Copyright (c) 2024-2025 Giulio Genovese
+   Copyright (c) 2024-2026 Giulio Genovese
 
    Author: Giulio Genovese <giulio.genovese@gmail.com>
 
@@ -240,7 +240,7 @@
 #include <htslib/ksort.h>
 #include <htslib/khash_str2int.h>
 #include "bcftools.h"
-#define IDAT2GTC_VERSION "2025-08-19"
+#define IDAT2GTC_VERSION "2026-01-26"
 
 #define AUTOCALL_DATE_FORMAT_DFLT "%m/%d/%y %#I:%M %p" // equivalent to "MM/dd/yyyy h:mm tt"
 #define AUTOCALL_VERSION_DFLT "3.0.0"
@@ -681,7 +681,7 @@ static int idat_read(idat_t *idat, uint16_t id) {
         break;
     case RUN_INFO:
         read_bytes(idat->hfile, (void *)&idat->m_run_infos, sizeof(int32_t), NULL);
-        idat->run_infos = (RunInfo *)malloc(idat->m_run_infos * sizeof(RunInfo));
+        idat->run_infos = (RunInfo *)calloc(idat->m_run_infos, sizeof(RunInfo));
         for (i = 0; i < idat->m_run_infos; i++) {
             read_pfx_string(idat->hfile, &idat->run_infos[i].run_time, NULL, NULL);
             read_pfx_string(idat->hfile, &idat->run_infos[i].block_type, NULL, NULL);
