@@ -98,7 +98,7 @@ Plugin options:
         --snp <file>                apt-probeset-genotype SNP posteriors output (can be gzip compressed)
         --chps <dir|file>           input CHP files rather than tab delimited files
         --cel <file>                input CEL files rather CHP files
-        --adjust-clusters           adjust cluster centers in (Contrast, Size) space (requires --snp)
+        --adjust-clusters           adjust cluster centers in (Contrast, Size) space (requires --calls, --summary, --snp)
         --no-version                do not append version and command line to the header
     -o, --output <file>             write output to a file [standard output]
     -O, --output-type u|b|v|z[0-9]  u/b: un/compressed BCF, v/z: un/compressed VCF, 0-9: compression level [v]

@@ -57,6 +57,7 @@
 #define FORMAT_NORMY (1 << 14)
 #define FORMAT_DELTA (1 << 15)
 #define FORMAT_SIZE (1 << 16)
+#define FORMAT_THETA (1 << 17)
 
 // #%affymetrix-algorithm-param-apt-opt-use-copynumber-call-codes=0
 // #%call-code-1=NoCall:-1:2
@@ -2001,6 +2002,10 @@ static bcf_hdr_t *hdr_init(const faidx_t *fai, int flags) {
                            "contrast value\">");
         if (flags & FORMAT_SIZE)
             bcf_hdr_append(hdr, "##FORMAT=<ID=SIZE,Number=1,Type=Float,Description=\"Normalized size value\">");
+        if (flags & FORMAT_THETA)
+            bcf_hdr_append(hdr,
+                           "##FORMAT=<ID=THETA,Number=1,Type=Float,Description=\"Normalized Theta value "
+                           "(2/pi * atan2(NORMY, NORMX), not truncated)\">");
     }
     if ((flags & SUMMARY_LOADED) && (flags & SNP_LOADED)) {
         if (flags & FORMAT_BAF)
@@ -2083,8 +2088,8 @@ static void update_info_cluster(const bcf_hdr_t *hdr, bcf1_t *rec, const char **
 // compute LRR and BAF
 // similar to
 // http://github.com/WGLab/PennCNV/blob/master/affy/bin/normalize_affy_geno_cluster.pl
-static void compute_baf_lrr(const float *norm_x, const float *norm_y, int n, const snp_t *snp, int is_birdseed,
-                            float *baf, float *lrr) {
+static void compute_baf_lrr(const float *norm_x, const float *norm_y, const float *theta, int n, const snp_t *snp,
+                            int is_birdseed, float *baf, float *lrr) {
     float aa_theta, ab_theta, bb_theta, aa_r, ab_r, bb_r;
 
     if (is_birdseed) {
@@ -2111,15 +2116,14 @@ static void compute_baf_lrr(const float *norm_x, const float *norm_y, int n, con
 
     int i;
     for (i = 0; i < n; i++) {
-        float ilmn_theta = atan2f(norm_y[i], norm_x[i]) * (float)M_2_PI;
         float ilmn_r = norm_x[i] + norm_y[i];
-        get_baf_lrr(ilmn_theta, ilmn_r, aa_theta, ab_theta, bb_theta, aa_r, ab_r, bb_r, NAN, &baf[i], &lrr[i]);
+        get_baf_lrr(theta[i], ilmn_r, aa_theta, ab_theta, bb_theta, aa_r, ab_r, bb_r, NAN, &baf[i], &lrr[i]);
     }
 }
 
 static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_models_t *snp_models, varitr_t *varitr,
                     htsFile *out_fh, bcf_hdr_t *hdr, int flags, int gc_win) {
-    int i, nsmpl = bcf_hdr_nsamples(hdr);
+    int i, j, nsmpl = bcf_hdr_nsamples(hdr);
     if ((flags & ADJUST_CLUSTERS) && (nsmpl < 100))
         fprintf(stderr, "Warning: adjusting clusters with %d sample(s) is not recommended\n", nsmpl);
 
@@ -2132,6 +2136,7 @@ static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_
     int32_t *gt_arr = (int32_t *)malloc(nsmpl * 2 * sizeof(int32_t));
     float *baf_arr = (float *)malloc(nsmpl * sizeof(float));
     float *lrr_arr = (float *)malloc(nsmpl * sizeof(float));
+    float *theta_arr = (float *)malloc(nsmpl * sizeof(float));
 
     int n_missing = 0, n_no_snp_models = 0, n_skipped = 0;
     for (i = 0; i < annot->n_records; i++) {
@@ -2234,26 +2239,26 @@ static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_
 
         if (varitr) {
             if ((varitr->data_sets || varitr->calls_fp) && flags & FORMAT_GT) {
-                for (i = 0; i < nsmpl; i++) {
-                    switch (varitr->gts[i]) {
+                for (j = 0; j < nsmpl; j++) {
+                    switch (varitr->gts[j]) {
                     case GT_AA:
-                        gt_arr[2 * i] = bcf_gt_unphased(allele_a_idx);
-                        gt_arr[2 * i + 1] = bcf_gt_unphased(allele_a_idx);
+                        gt_arr[2 * j] = bcf_gt_unphased(allele_a_idx);
+                        gt_arr[2 * j + 1] = bcf_gt_unphased(allele_a_idx);
                         break;
                     case GT_AB:
-                        gt_arr[2 * i] = bcf_gt_unphased(min(allele_a_idx, allele_b_idx));
-                        gt_arr[2 * i + 1] = bcf_gt_unphased(max(allele_a_idx, allele_b_idx));
+                        gt_arr[2 * j] = bcf_gt_unphased(min(allele_a_idx, allele_b_idx));
+                        gt_arr[2 * j + 1] = bcf_gt_unphased(max(allele_a_idx, allele_b_idx));
                         break;
                     case GT_BB:
-                        gt_arr[2 * i] = bcf_gt_unphased(allele_b_idx);
-                        gt_arr[2 * i + 1] = bcf_gt_unphased(allele_b_idx);
+                        gt_arr[2 * j] = bcf_gt_unphased(allele_b_idx);
+                        gt_arr[2 * j + 1] = bcf_gt_unphased(allele_b_idx);
                         break;
                     case GT_NC:
-                        gt_arr[2 * i] = bcf_gt_missing;
-                        gt_arr[2 * i + 1] = bcf_gt_missing;
+                        gt_arr[2 * j] = bcf_gt_missing;
+                        gt_arr[2 * j + 1] = bcf_gt_missing;
                         break;
                     default:
-                        error("Genotype for Probe Set ID %s is malformed: %d\n", record->probeset_id, varitr->gts[i]);
+                        error("Genotype for Probe Set ID %s is malformed: %d\n", record->probeset_id, varitr->gts[j]);
                         break;
                     }
                 }
@@ -2268,13 +2273,17 @@ static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_
                 if (flags & FORMAT_NORMY) bcf_update_format_float(hdr, rec, "NORMY", varitr->norm_y_arr, nsmpl);
                 if (flags & FORMAT_DELTA) bcf_update_format_float(hdr, rec, "DELTA", varitr->delta_arr, nsmpl);
                 if (flags & FORMAT_SIZE) bcf_update_format_float(hdr, rec, "SIZE", varitr->size_arr, nsmpl);
+                // Theta is not truncated to [0,1] (values outside that range require negative intensities)
+                for (j = 0; j < nsmpl; j++)
+                    theta_arr[j] = atan2f(varitr->norm_y_arr[j], varitr->norm_x_arr[j]) * (float)M_2_PI;
+                if (flags & FORMAT_THETA) bcf_update_format_float(hdr, rec, "THETA", theta_arr, nsmpl);
             }
         }
 
         if (snp_models) {
             int rets[2], idxs[2];
-            for (i = 0; i < 2; i++) {
-                rets[i] = khash_str2int_get(snp_models->probeset_id[i], record->probeset_id, &idxs[i]);
+            for (j = 0; j < 2; j++) {
+                rets[j] = khash_str2int_get(snp_models->probeset_id[j], record->probeset_id, &idxs[j]);
             }
             static const char *hap_info_str[] = {
                 "meanX_AA.1",    "meanX_AB.1",    "meanX_BB.1",    "varX_AA.1",    "varX_AB.1",    "varX_BB.1",
@@ -2298,8 +2307,8 @@ static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_
                     adjust_clusters(varitr->gts, snp_models->is_birdseed ? varitr->norm_x_arr : varitr->delta_arr,
                                     snp_models->is_birdseed ? varitr->norm_y_arr : varitr->size_arr, nsmpl, snp);
                 if (flags & SUMMARY_LOADED) {
-                    compute_baf_lrr(varitr->norm_x_arr, varitr->norm_y_arr, nsmpl, snp, snp_models->is_birdseed,
-                                    baf_arr, lrr_arr);
+                    compute_baf_lrr(varitr->norm_x_arr, varitr->norm_y_arr, theta_arr, nsmpl, snp,
+                                    snp_models->is_birdseed, baf_arr, lrr_arr);
                     if (flags & FORMAT_BAF) bcf_update_format_float(hdr, rec, "BAF", baf_arr, nsmpl);
                     if (flags & FORMAT_LRR) bcf_update_format_float(hdr, rec, "LRR", lrr_arr, nsmpl);
                 }
@@ -2317,6 +2326,7 @@ static void process(faidx_t *fai, const annot_t *annot, void *probeset_ids, snp_
     free(gt_arr);
     free(baf_arr);
     free(lrr_arr);
+    free(theta_arr);
 
     free(allele_a.s);
     free(allele_b.s);
@@ -2357,7 +2367,7 @@ static const char *usage_text(void) {
            "        --snp <file>                apt-probeset-genotype SNP posteriors output (can be gzip compressed)\n"
            "        --chps <dir|file>           input CHP files rather than tab delimited files\n"
            "        --cel <file>                input CEL files rather CHP files\n"
-           "        --adjust-clusters           adjust cluster centers in (Contrast, Size) space (requires --snp)\n"
+           "        --adjust-clusters           adjust cluster centers in (Contrast, Size) space (requires --calls, --summary, --snp)\n"
            "        --no-version                do not append version and command line to the header\n"
            "    -o, --output <file>             write output to a file [standard output]\n"
            "    -O, --output-type u|b|v|z[0-9]  u/b: un/compressed BCF, v/z: un/compressed VCF, 0-9: compression level "
@@ -2413,6 +2423,8 @@ static int parse_tags(const char *str) {
             flags |= FORMAT_DELTA;
         else if (!strcasecmp(tags[i], "SIZE"))
             flags |= FORMAT_SIZE;
+        else if (!strcasecmp(tags[i], "THETA"))
+            flags |= FORMAT_THETA;
         else if (!strcasecmp(tags[i], "LRR"))
             flags |= FORMAT_LRR;
         else if (!strcasecmp(tags[i], "BAF"))
@@ -2434,7 +2446,8 @@ static void list_tags(void) {
         "FORMAT/NORMX    Number:1  Type:Float    ..  Normalized X intensity\n"
         "FORMAT/NORMY    Number:1  Type:Float    ..  Normalized Y intensity\n"
         "FORMAT/DELTA    Number:1  Type:Float    ..  Normalized Delta value\n"
-        "FORMAT/SIZE     Number:1  Type:Float    ..  Normalized Size value\n");
+        "FORMAT/SIZE     Number:1  Type:Float    ..  Normalized Size value\n"
+        "FORMAT/THETA    Number:1  Type:Float    ..  Normalized Theta value (not truncated)\n");
 }
 
 int run(int argc, char *argv[]) {
@@ -2617,8 +2630,8 @@ int run(int argc, char *argv[]) {
             error("Only one of --fasta-flank or --sam-flank options can be used at once\n%s", usage_text());
         if (!fasta_flank && !sam_fname && !ref_fname)
             error("Expected one of --fasta-flank or --sam-flank or --fasta-ref options\n%s", usage_text());
-        if ((flags & ADJUST_CLUSTERS) && (!summary_fname || !snp_fname))
-            error("Expected --summary and --snp options with --adjust-clusters option\n%s", usage_text());
+        if ((flags & ADJUST_CLUSTERS) && (!calls_fname || !summary_fname || !snp_fname))
+            error("Expected --calls, --summary, and --snp options with --adjust-clusters option\n%s", usage_text());
         if (nfiles == 0 && extra_fname) error("Expected CHP files with --extra option\n%s", usage_text());
         if (nfiles > 0 && (calls_fname || confidences_fname || summary_fname))
             error(
